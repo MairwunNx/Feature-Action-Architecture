@@ -23,6 +23,9 @@ All examples here are in TypeScript + functional style, but the ideas are univer
   - [⚡ Quick Example](#-quick-example)
     - [The Flow](#the-flow)
   - [🚦 Dependency Rules](#-dependency-rules)
+  - [🔗 Connect FAA to Your Project](#-connect-faa-to-your-project)
+    - [1) Link to this repository](#1-link-to-this-repository)
+    - [2) Add FAA as a git submodule (recommended)](#2-add-faa-as-a-git-submodule-recommended)
   - [📚 Learn More](#-learn-more)
     - [Language Examples](#language-examples)
 
@@ -285,6 +288,46 @@ graph LR
 
 > [!WARNING]
 > If two features need the same logic — **don't import horizontally**. Move the shared logic down to an Entity or Shared layer.
+
+---
+
+## 🔗 Connect FAA to Your Project
+
+You have two ways to attach FAA documentation to your repo (for humans and AI agents):
+
+### 1) Link to this repository
+
+Add a link in your project prompt/README (`https://github.com/MairwunNx/Feature-Action-Architecture/blob/master/MANIFEST.md`).
+
+This is quick, but **not always effective** — many LLM agents fetch links partially or ignore them depending on their tooling. That can lead to an incomplete picture.
+
+### 2) Add FAA as a git submodule (recommended)
+
+This makes the docs **local to the repo**, so agents can always read them.
+
+**Git submodule declaration (example):**
+
+```
+# .gitmodules
+[submodule "Feature-Action-Architecture"]
+  path = Feature-Action-Architecture
+  url = https://github.com/MairwunNx/Feature-Action-Architecture.git
+```
+
+**Project prompt snippet (you can paste into your AI/project prompt):**
+
+```
+### Project architecture
+
+All FAA (Feature-Action Architecture) docs live in `./Feature-Action-Architecture`.
+Use the example closest to our stack.
+
+Stack: <your stack here> # example: TS & Bun & typed-inject
+Example: `Feature-Action-Architecture/examples/ts-bun.md`  # replace with your file
+
+AI notes: `Feature-Action-Architecture/AI.md`
+Architecture Manifest: `Feature-Action-Architecture/MANIFEST.md`
+```
 
 ---
 
