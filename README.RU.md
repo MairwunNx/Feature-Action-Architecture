@@ -24,6 +24,7 @@ FAA — это адаптация [Feature-Sliced Design](https://feature-sliced
     - [Флоу данных](#флоу-данных)
   - [🚦 Правила Зависимостей](#-правила-зависимостей)
   - [📚 Читай Дальше](#-читай-дальше)
+    - [Примеры по языкам](#примеры-по-языкам)
 
 ---
 
@@ -78,10 +79,10 @@ FAA переворачивает подход:
 
 ```mermaid
 graph TD
-    APP["🏗️ App\nСборка · DI · Роутинг"] --> FEATURES
-    FEATURES["⚡ Features\nБизнес-сценарии"] --> ENTITIES
-    ENTITIES["📦 Entities\nДоменные данные · CRUD"] --> SHARED
-    SHARED["🔧 Shared\nИнфра · Утилиты"]
+    APP["🏗️ App<br/>Сборка · DI · Роутинг"] --> FEATURES
+    FEATURES["⚡ Features<br/>Бизнес-сценарии"] --> ENTITIES
+    ENTITIES["📦 Entities<br/>Доменные данные · CRUD"] --> SHARED
+    SHARED["🔧 Shared<br/>Инфра · Утилиты"]
 
     style APP fill:#e1f5fe,stroke:#0288d1
     style FEATURES fill:#f3e5f5,stroke:#7b1fa2
@@ -293,6 +294,18 @@ graph LR
 |---|---|
 | 📜 [MANIFEST.md](./MANIFEST.RU.md) | Философия, "зачем всё это", гайд по принятию решений |
 | 🤖 [AI.md](./AI.md) | Правила и паттерны для AI/LLM агентов, работающих с FAA |
+
+### Примеры по языкам
+
+Полные примеры со структурой проекта, DI и кодом:
+
+| Стек | Пример |
+|---|---|
+| TypeScript + Bun | [examples/ts-bun.md](./examples/ts-bun.md) |
+| Kotlin + Spring Boot | [examples/kotlin-springboot.md](./examples/kotlin-springboot.md) |
+| Go + Gin + uber-fx | [examples/golang-gin.md](./examples/golang-gin.md) |
+| Python + Django | [examples/python-django.md](./examples/python-django.md) |
+| C# + ASP.NET Core | [examples/csharp-asp.md](./examples/csharp-asp.md) |
 
 ---
 

@@ -24,6 +24,7 @@ All examples here are in TypeScript + functional style, but the ideas are univer
     - [The Flow](#the-flow)
   - [🚦 Dependency Rules](#-dependency-rules)
   - [📚 Learn More](#-learn-more)
+    - [Language Examples](#language-examples)
 
 ---
 
@@ -78,10 +79,10 @@ FAA flips the traditional approach:
 
 ```mermaid
 graph TD
-    APP["🏗️ App\nAssembly · DI · Routing"] --> FEATURES
-    FEATURES["⚡ Features\nBusiness Scenarios"] --> ENTITIES
-    ENTITIES["📦 Entities\nDomain Data · CRUD"] --> SHARED
-    SHARED["🔧 Shared\nInfra · Utilities"]
+    APP["🏗️ App<br/>Assembly · DI · Routing"] --> FEATURES
+    FEATURES["⚡ Features<br/>Business Scenarios"] --> ENTITIES
+    ENTITIES["📦 Entities<br/>Domain Data · CRUD"] --> SHARED
+    SHARED["🔧 Shared<br/>Infra · Utilities"]
 
     style APP fill:#e1f5fe,stroke:#0288d1
     style FEATURES fill:#f3e5f5,stroke:#7b1fa2
@@ -293,6 +294,18 @@ graph LR
 |---|---|
 | 📜 [MANIFEST.md](./MANIFEST.md) | The philosophy, the "why", decision guide |
 | 🤖 [AI.md](./AI.md) | Rules & patterns for AI/LLM agents working with FAA |
+
+### Language Examples
+
+Full working examples with project structure, DI wiring, and code snippets:
+
+| Stack | Example |
+|---|---|
+| TypeScript + Bun | [examples/ts-bun.md](./examples/ts-bun.md) |
+| Kotlin + Spring Boot | [examples/kotlin-springboot.md](./examples/kotlin-springboot.md) |
+| Go + Gin + uber-fx | [examples/golang-gin.md](./examples/golang-gin.md) |
+| Python + Django | [examples/python-django.md](./examples/python-django.md) |
+| C# + ASP.NET Core | [examples/csharp-asp.md](./examples/csharp-asp.md) |
 
 ---
 

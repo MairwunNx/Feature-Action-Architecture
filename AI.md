@@ -5,24 +5,25 @@
 If you're an AI working with an FAA codebase — **read this first**.
 
 > [!NOTE]
-> Examples in this document use TypeScript and a functional style (no classes). DI examples are shown **for example** with `typed-inject`.
+> This document is **language-agnostic**. For concrete code examples in your stack, see [Language Examples](#-language-examples).
 
 ---
 
 ## 📖 Table of Contents
 
-- [Architecture Overview](#-architecture-overview)
+- [Architecture Overview](#️-architecture-overview)
 - [Layer Rules](#-layer-rules)
 - [Creating a New Feature](#-creating-a-new-feature)
 - [Creating a New Entity](#-creating-a-new-entity)
-- [Code Patterns](#-code-patterns)
+- [Patterns & Principles](#-patterns--principles)
 - [File Naming](#-file-naming)
 - [Dependency Injection](#-dependency-injection)
-- [Where to Put Code — Decision Tree](#-where-to-put-code--decision-tree)
-- [Import Rules](#-import-rules)
+- [Where to Put Code — Decision Tree](#️-where-to-put-code--decision-tree)
+- [Dependency Rules](#-dependency-rules)
 - [Anti-Patterns — What NOT to Do](#-anti-patterns--what-not-to-do)
 - [Refactoring Guide](#-refactoring-guide)
 - [Checklist](#-checklist)
+- [Language Examples](#-language-examples)
 
 ---
 
@@ -50,7 +51,7 @@ graph TD
 ```
 
 > [!IMPORTANT]
-> **NEVER** import upward or horizontally between same-level modules. This is the #1 rule.
+> **NEVER** import/reference upward or horizontally between same-level modules. This is the #1 rule.
 
 ---
 
@@ -62,7 +63,7 @@ graph TD
 |---|---|
 | **Purpose** | Wire everything together. Create DI container, register routes, start server. |
 | **Can import from** | Features, Entities, Shared |
-| **Contains** | `container.ts`, `routes.ts`, `server.ts`, `factory.ts`, `context.ts`, `cors.ts`, middleware wiring |
+| **Contains** | DI wiring, route registration, server init, middleware wiring |
 | **Should NOT contain** | Business logic, DB queries, domain types |
 
 ### Features Layer (`features/`)
@@ -72,7 +73,7 @@ graph TD
 | **Purpose** | Implement business use cases. Each feature = one slice of functionality. |
 | **Can import from** | Entities, Shared |
 | **CANNOT import from** | Other Features, App |
-| **Contains** | Actions (`.action.ts`), HTTP handlers (`api/`), feature-specific queries (`db/`), local helpers (`lib/`), types |
+| **Contains** | Actions (business logic), HTTP handlers (`api/`), feature-specific queries (`db/`), local helpers (`lib/`), types/DTOs |
 
 ### Entities Layer (`entities/`)
 
@@ -81,7 +82,7 @@ graph TD
 | **Purpose** | Own domain data. Provide CRUD and reusable domain logic. |
 | **Can import from** | Shared only |
 | **CANNOT import from** | Other Entities, Features, App |
-| **Contains** | Model (`model.ts`), DAL (`dal.ts`), domain logic (`lib/`), cache (`cache.ts`), types |
+| **Contains** | DB model/schema, DAL (CRUD), domain logic (`lib/`), cache, types |
 
 ### Shared Layer (`shared/`)
 
@@ -96,91 +97,56 @@ graph TD
 
 ## 🆕 Creating a New Feature
 
-When you need to add a new feature (business use case), follow this template:
+When you need to add a new feature (business use case), follow these steps:
 
 ### Step 1: Create the directory structure
 
 ```
 features/{feature-name}/
 ├── api/
-│   └── handler.ts
-├── {name}.action.ts
-├── types.ts
-└── index.ts
+│   └── handler          # HTTP transport layer (thin)
+├── {verb}.action         # Business logic (THE action)
+├── types                 # Request/response types, DTOs
+└── [public API boundary] # index.ts in TS/JS; access modifiers in Java/C#/Go
 ```
 
-Add `db/` and `lib/` only if needed.
+Add `db/` (feature-specific queries) and `lib/` (local helpers) only if needed.
 
 ### Step 2: Write the Action
 
-```typescript
-// features/{name}/{verb}.action.ts
+The action is a function/class that:
 
-type Deps = {
-  // List entity DALs and shared services this action needs
-  userDal: ReturnType<typeof createUserDal>;
-  config: AppConfig;
-};
+1. **Receives dependencies** via constructor/factory parameters (entity DALs, config, services)
+2. **Accepts input** (validated request data)
+3. **Orchestrates** — fetches data from entities, applies business rules, performs operations
+4. **Returns result** — a domain object or DTO
 
-export const create{Name}Action = (deps: Deps) =>
-  async (input: InputType): Promise<OutputType> => {
-    // 1. Fetch data from entities
-    const user = await deps.userDal.findById(input.userId);
-
-    // 2. Apply business rules
-    if (!user) throw new AppError("User not found", 404);
-
-    // 3. Perform operations
-    const result = await deps.userDal.update(user.id, input.changes);
-
-    // 4. Return result
-    return result;
-  };
-create{Name}Action.inject = ["userDal", "config"] as const;
-```
+> [!TIP]
+> One action = one use case. If an action does auth + profile + notifications, split it.
 
 ### Step 3: Write the Handler
 
-```typescript
-// features/{name}/api/handler.ts
+The handler is **thin**. It does exactly three things:
 
-export const create{Name}Handler = (action: ReturnType<typeof create{Name}Action>) =>
-  async (req: Request): Promise<Response> => {
-    // Parse request
-    const input = await req.json();
+1. **Parse** — extract and validate input from the HTTP request
+2. **Delegate** — call the action with the parsed input
+3. **Respond** — format the action result into an HTTP response
 
-    // Call action
-    const result = await action(input);
+No business logic. No direct DB access. No domain decisions.
 
-    // Return response
-    return Response.json({ data: result });
-  };
-create{Name}Handler.inject = ["{name}Action"] as const;
-```
+### Step 4: Control the public API boundary
 
-### Step 4: Write the index.ts (TS/JS public API boundary)
+- **TS/JS:** Create `index.ts` that re-exports only the action factory and handler factory. Keep it lean.
+- **Java/Kotlin:** Use `package-private` (default) for internal classes, `public` only for what other layers need.
+- **C#:** Use `internal` for feature internals, `public` only for the action/handler.
+- **Go:** Use unexported names (lowercase) for internal functions.
 
-```typescript
-// features/{name}/index.ts
-export { create{Name}Action } from "./{name}.action";
-export { create{Name}Handler } from "./api/handler";
-```
+### Step 5: Register in App
 
-> In Java / C# / Go, skip this step — use access modifiers (`package-private`, `internal`, unexported) to hide internals instead.
+Add the new action and handler to your DI container / wiring in the App layer. The registration order should mirror the layer hierarchy: Shared → Entities → Features → Handlers.
 
-### Step 5: Register in App (typed-inject)
-
-```typescript
-// app/container.ts — add to DI container
-import { createInjector } from "typed-inject";
-
-export const createContainer = () => {
-  return createInjector()
-    .provideFactory("userDal", createUserDal)
-    .provideFactory("loginAction", createLoginAction)
-    .provideFactory("loginHandler", createLoginHandler);
-};
-```
+> [!NOTE]
+> For complete code examples of all steps, see [Language Examples](#-language-examples).
 
 ---
 
@@ -192,236 +158,137 @@ When you need a new domain data model:
 
 ```
 entities/{entity-name}/
-├── model.ts
-├── dal.ts
-└── types.ts
+├── model              # DB schema / entity class
+├── dal                # Data Access Layer (generic CRUD)
+└── types              # Domain types
 ```
 
-Add `lib/` and `cache.ts` only if needed.
+Add `lib/` (reusable domain logic) and `cache` only if needed.
 
 ### Step 2: Define the Model
 
-```typescript
-// entities/{name}/model.ts
-import { Schema, model } from "mongoose";
-
-interface IEntity {
-  field1: string;
-  field2: number;
-  created_at: Date;
-}
-
-const schema = new Schema<IEntity>({
-  field1: { type: String, required: true },
-  field2: { type: Number, required: true },
-  created_at: { type: Date, default: Date.now },
-});
-
-export const EntityModel = model<IEntity>("Entity", schema);
-export type { IEntity };
-```
+The DB schema/entity definition. Only schema — no logic.
 
 ### Step 3: Create the DAL
 
-```typescript
-// entities/{name}/dal.ts
-import { EntityModel } from "./model";
+The DAL contains **only generic CRUD**: `findById`, `findMany`, `create`, `update`, `delete`.
 
-export const createEntityDal = () => ({
-  findById: (id: string) =>
-    EntityModel.findById(id).lean(),
-
-  create: (data: Partial<IEntity>) =>
-    EntityModel.create(data),
-
-  update: (id: string, data: Partial<IEntity>) =>
-    EntityModel.findByIdAndUpdate(id, data, { new: true }).lean(),
-
-  delete: (id: string) =>
-    EntityModel.findByIdAndDelete(id),
-});
-```
+Rules:
+- No business logic
+- No complex aggregations
+- No side effects (no emails, no events)
+- Just thin wrappers around DB operations
 
 ### Step 4: Add domain logic if needed
 
-```typescript
-// entities/{name}/lib/queries.ts — complex reads
-export const createEntityQueries = (dal: ReturnType<typeof createEntityDal>) => ({
-  getOrCreate: async (uniqueField: string) => {
-    const existing = await dal.findById(uniqueField);
-    if (existing) return existing;
-    return dal.create({ field1: uniqueField });
-  },
-});
-```
+If the entity has reusable logic needed by 2+ features, create `lib/`:
+
+| File | Contents |
+|---|---|
+| `lib/queries` | Complex read operations (`getOrCreate`, `findWithRelations`) |
+| `lib/commands` | Complex write operations (`deactivate`, `archive`) |
+| `lib/helpers` | Pure domain functions (`normalize`, `validate`, `calculate`) |
 
 ---
 
-## 📝 Code Patterns
+## 📝 Patterns & Principles
 
-### Action Factory Pattern
+### Action = Orchestrator
 
-```typescript
-// The STANDARD way to create an action
+An action is the **only place** where business logic lives. It:
 
-type {Name}ActionDeps = {
-  entityDal: ReturnType<typeof createEntityDal>;
-  // ... other dependencies
-};
+- Calls entity DALs to fetch/persist data
+- Applies domain rules and validations
+- Coordinates side effects (email, cache, events)
+- Returns a result
 
-export const create{Name}Action = (deps: {Name}ActionDeps) =>
-  async (input: InputType): Promise<OutputType> => {
-    // orchestration logic
-  };
+An action does NOT:
+- Parse HTTP requests (that's the handler's job)
+- Access the DB directly (that's the DAL's job)
+- Import from other features (that's forbidden)
+
+### Handler = Thin Transport Layer
+
+A handler translates between HTTP and your domain:
+
+```
+Request → [parse] → Action(input) → [format] → Response
 ```
 
-### Handler Pattern
+If your handler has `if` statements about domain logic, or calls the DB directly — it's too fat. Move that logic to the action.
 
-```typescript
-// Handlers are THIN — parse, delegate, respond
+### DAL = Pure CRUD
 
-export const create{Name}Handler = (action: ActionFn) =>
-  async (req: Request): Promise<Response> => {
-    const input = parseRequest(req);     // parse
-    const result = await action(input);  // delegate
-    return formatResponse(result);       // respond
-  };
-```
-
-### Feature-Specific Query Pattern
-
-```typescript
-// features/{name}/db/pipelines.ts
-// Complex queries that only THIS feature needs
-
-import { SomeModel } from "@/entities/some/model";
-
-export const getComplexData = (params: Params) =>
-  SomeModel.aggregate([
-    { $match: { /* ... */ } },
-    { $group: { /* ... */ } },
-    { $sort: { /* ... */ } },
-  ]);
-```
-
-### Entity DAL Pattern
-
-```typescript
-// ONLY generic CRUD. No business logic. No complex queries.
-
-export const createEntityDal = () => ({
-  findById: (id) => Model.findById(id).lean(),
-  findMany: (filter) => Model.find(filter).lean(),
-  create: (data) => Model.create(data),
-  update: (id, data) => Model.findByIdAndUpdate(id, data, { new: true }).lean(),
-  delete: (id) => Model.findByIdAndDelete(id),
-});
-// If DAL needs external deps, add inject tokens:
-// createEntityDal.inject = ["mongo"] as const;
-```
+The DAL is a thin data access wrapper. Nothing more.
 
 ### DAL vs Lib — Borderline Cases
 
 | Method | Where? | Why |
 |---|---|---|
-| `findAllActive()` | `dal.ts` | Simple filter — `find({ active: true })`. Still CRUD. |
-| `findWithStats()` | `lib/queries.ts` | Aggregation / join — beyond a basic `.find()`. |
-| `deactivateExpired()` | `lib/commands.ts` | Contains domain rule (what counts as "expired"). |
+| `findAllActive()` | DAL | Simple filter (e.g. `WHERE active = true`). Still CRUD. |
+| `findWithStats()` | `lib/queries` | Aggregation / join — beyond a basic query. |
+| `deactivateExpired()` | `lib/commands` | Contains domain rule (what counts as "expired"). |
 
-> Rule of thumb: a single `.find()` / `.findOne()` with a trivial filter → DAL. Anything more complex → `lib/`.
+> Rule of thumb: a simple query with a trivial filter → DAL. Anything with domain logic or complex joins → `lib/`.
 
-### Entity Lib Pattern
+### Feature or Entity?
 
-```typescript
-// Reusable domain logic — used by MULTIPLE features
-
-// entities/{name}/lib/queries.ts — complex reads
-export const getOrCreate = async (field: string) => { /* ... */ };
-
-// entities/{name}/lib/commands.ts — complex writes
-export const deactivate = async (id: string) => { /* ... */ };
-
-// entities/{name}/lib/helpers.ts — pure functions
-export const normalize = (value: string): string => { /* ... */ };
-```
+- **Will this logic be used by 2+ features?** → Entity (`entities/{name}/lib/`)
+- **Only one feature needs it?** → Keep it in that feature (`features/{name}/db/` or `features/{name}/lib/`)
 
 ---
 
 ## 📁 File Naming
 
-| Element | Pattern | Example |
+### Language-agnostic conventions
+
+| Element | Naming pattern | Example |
 |---|---|---|
-| Action file | `{verb}.action.ts` | `login.action.ts`, `generate.action.ts` |
-| Action factory | `create{Name}Action` | `createLoginAction`, `createGenerateAction` |
-| Handler file | `handler.ts` inside `api/` | `features/auth/api/handler.ts` |
-| Handler factory | `create{Name}Handler` | `createLoginHandler` |
-| Entity DAL factory | `create{Name}Dal` | `createUserDal` |
-| Entity model file | `model.ts` | `entities/user/model.ts` |
-| Entity DAL file | `dal.ts` | `entities/user/dal.ts` |
-| Entity cache file | `cache.ts` | `entities/user/cache.ts` |
-| Feature DB queries | `pipelines.ts`, `queries.ts` | `features/race/db/pipelines.ts` |
-| Types file | `types.ts` | `features/auth/types.ts` |
-| Public API | `index.ts` | `features/auth/index.ts` |
-| Feature-local helpers | `helpers.ts` inside `lib/` | `features/auth/lib/helpers.ts` |
+| Action file | `{verb}.action` or `{Verb}Action` | `login.action.ts`, `CreateOrderAction.kt` |
+| Handler file | `handler` inside `api/` | `features/auth/api/handler.ts`, `OrderController.kt` |
+| Entity model | `model` or entity name | `model.ts`, `User.cs`, `model.go` |
+| Entity DAL | `dal` | `dal.ts`, `UserDal.kt`, `dal.go` |
+| Feature DB queries | `pipelines`, `queries` | `features/leaderboard/db/pipelines.ts` |
+| Types / DTOs | `types` or `dto/` | `types.ts`, `dto/OrderDto.kt` |
 
 > [!TIP]
-> Action files use the **verb** as the name: `login`, `generate`, `get-profile`, `update-privacy`.
-> Not nouns: ~~`auth.action.ts`~~, ~~`user.action.ts`~~.
+> Action files use the **verb** as the name: `login`, `generate`, `get-profile`, `create-order`.
+> Not nouns: ~~`auth.action`~~, ~~`user.action`~~.
 
 ---
 
 ## 🔌 Dependency Injection
 
-### Factory DI (Recommended, with typed-inject)
+### Principle
 
-Every action, handler, and entity DAL is created through a factory that explicitly declares its dependencies:
+Every action, handler, and DAL declares its dependencies explicitly through constructor/factory parameters. No hidden globals, no magic imports of singletons.
 
-```typescript
-// Declaration
-export const createSomeAction = (deps: { userDal, config }) =>
-  async (input) => { /* uses deps.userDal, deps.config */ };
-createSomeAction.inject = ["userDal", "config"] as const;
+### Container wiring order
 
-// Wiring (in app/container.ts)
-const container = createInjector()
-  .provideValue("config", config)
-  .provideFactory("userDal", createUserDal)
-  .provideFactory("someAction", createSomeAction);
+The DI container must register dependencies in layer order:
+
 ```
-
-### Container Pattern
-
-```typescript
-// app/container.ts
-import { createInjector } from "typed-inject";
-
-export const createContainer = async () => {
-  // 1. Shared (infra)
-  const config = await loadConfig();
-  const mongo = await connectMongo(config);
-
-  // 2. Entities (depend on Shared)
-  const container = createInjector()
-    .provideValue("config", config)
-    .provideValue("mongo", mongo)
-    .provideFactory("userDal", createUserDal)
-    .provideFactory("cockDal", createCockDal)
-
-    // 3. Features (depend on Entities + Shared)
-    .provideFactory("loginAction", createLoginAction)
-    .provideFactory("generateSizeAction", createGenerateSizeAction)
-
-    // 4. Handlers (depend on Actions)
-    .provideFactory("loginHandler", createLoginHandler)
-    .provideFactory("sizeHandler", createSizeHandler);
-
-  return container;
-};
+1. Shared    (config, DB connection, logger)
+2. Entities  (DALs — depend on Shared)
+3. Features  (Actions — depend on Entities + Shared)
+4. Handlers  (depend on Actions)
 ```
 
 > [!IMPORTANT]
-> The container follows the same layer order: Shared → Entities → Features → Handlers.
-> This is not a coincidence — it mirrors the dependency flow.
+> This is not a coincidence — the registration order mirrors the dependency flow.
+
+### DI per stack
+
+| Stack | DI mechanism |
+|---|---|
+| TypeScript | `typed-inject`, `tsyringe`, or manual factories |
+| Kotlin / Spring | Spring DI (`@Service`, `@Repository`, constructor injection) |
+| Go | `uber-fx`, `wire`, or manual wiring |
+| Python | `dependency-injector`, or manual container with `@dataclass` |
+| C# / ASP.NET | Built-in `IServiceCollection` (`AddScoped`, `AddTransient`) |
+
+> [!NOTE]
+> For concrete DI wiring examples, see [Language Examples](#-language-examples).
 
 ---
 
@@ -444,10 +311,10 @@ Is it a reusable middleware (auth guard, rate limiter, request validation)?
   → app/ (wiring it to routes)
 
 Is it a DB schema/model?
-  → entities/{name}/model.ts
+  → entities/{name}/model
 
 Is it generic CRUD for one entity?
-  → entities/{name}/dal.ts
+  → entities/{name}/dal
 
 Is it reusable domain logic for one entity (used or will be used by 2+ features)?
   → entities/{name}/lib/
@@ -456,145 +323,85 @@ Is it a complex query needed by only one feature?
   → features/{name}/db/
 
 Is it business orchestration (calling multiple entities)?
-  → features/{name}/{verb}.action.ts
+  → features/{name}/{verb}.action
 
 Is it an HTTP handler?
-  → features/{name}/api/handler.ts
+  → features/{name}/api/handler
 
-Is it a response/request type for one feature?
-  → features/{name}/types.ts
+Is it a request/response type for one feature?
+  → features/{name}/types
 ```
 
 ---
 
-## 🚫 Import Rules
+## 🚫 Dependency Rules
 
-### ✅ Allowed Imports
+### ✅ Allowed
 
-```typescript
-// Feature → Entity ✅
-import { createUserDal } from "@/entities/user";
+| Direction | Example |
+|---|---|
+| Feature → Entity | Action uses the User DAL |
+| Feature → Shared | Action uses a datetime utility |
+| Entity → Shared | Model uses a shared type |
+| App → Feature | Container wires an action |
+| App → Entity | Container wires a DAL |
+| App → Shared | Container reads config |
 
-// Feature → Shared ✅
-import { formatDate } from "@/shared/lib/datetime";
-import { AppError } from "@/shared/api/errors";
+### ❌ Forbidden
 
-// Entity → Shared ✅
-import { moscowNow } from "@/shared/lib/datetime";
-
-// App → Feature ✅
-import { createLoginAction } from "@/features/auth";
-
-// App → Entity ✅
-import { createUserDal } from "@/entities/user";
-```
-
-### ❌ Forbidden Imports
-
-```typescript
-// Feature → Feature ❌ NEVER (including types, errors, anything)
-import { something } from "../other-feature";
-import type { SomeType } from "../other-feature/types"; // ❌ types too!
-// Fix: move shared logic/types to an Entity or Shared
-// Note: in Java/C# the same rule applies — don't reference classes from another feature's package/namespace.
-
-// Entity → Entity ❌ NEVER
-import { UserModel } from "../user/model";
-// Fix: do the join in the Feature action
-
-// Entity → Feature ❌ NEVER (upward)
-import { loginAction } from "@/features/auth";
-
-// Shared → Entity ❌ NEVER (upward)
-import { UserModel } from "@/entities/user/model";
-
-// Shared → Feature ❌ NEVER (upward)
-import { createLoginAction } from "@/features/auth";
-```
+| Direction | Why | Fix |
+|---|---|---|
+| Feature → Feature | Horizontal dependency (includes types, errors, everything) | Move shared logic/types to Entity or Shared |
+| Entity → Entity | Entities are isolated | Do the join in the Feature action |
+| Entity → Feature | Upward dependency | Never |
+| Shared → Entity | Upward dependency | Never |
+| Shared → Feature | Upward dependency | Never |
 
 > [!CAUTION]
-> When you see a horizontal or upward import — **STOP**. Refactor before proceeding.
+> When you see a horizontal or upward dependency — **STOP**. Refactor before proceeding.
 > Move shared logic down to the appropriate layer.
 
 ---
 
 ## 🚫 Anti-Patterns — What NOT to Do
 
-### ❌ God Action (too many responsibilities)
+### ❌ God Action
 
-```typescript
-// BAD
-export const createMonsterAction = (deps) =>
-  async (userId) => {
-    // auth logic (50 lines)
-    // profile logic (50 lines)
-    // notification logic (50 lines)
-    // analytics logic (50 lines)
-  };
-```
+An action that does auth + profile + notifications + analytics in 200 lines.
 
-**Fix:** Split into separate actions in separate features.
+**Fix:** Split into separate actions in separate features. One action = one use case.
 
 ---
 
 ### ❌ Business Logic in DAL
 
-```typescript
-// BAD
-export const createUserDal = () => ({
-  register: async (data) => {
-    const passwordHash = await bcrypt.hash(data.password); // ❌ business logic
-    const user = await UserModel.create({ ...data, password: passwordHash });
-    await sendWelcomeEmail(user.email); // ❌ side effect
-    return user;
-  },
-});
-```
+A DAL method that hashes passwords, sends emails, or calculates levels.
 
-**Fix:** DAL only does `create`. Hashing and emailing happen in the action.
+**Fix:** DAL only does CRUD. Hashing, emailing, and calculations happen in the action.
 
 ---
 
-### ❌ Handler with Business Logic
+### ❌ Fat Handler
 
-```typescript
-// BAD
-export const createHandler = () =>
-  async (req: Request) => {
-    const body = await req.json();
-    const user = await UserModel.findById(body.id); // ❌ direct DB access
-    if (user.role !== "admin") throw new Error("Forbidden"); // ❌ business logic
-    await UserModel.updateOne({ _id: body.id }, { active: false }); // ❌ direct DB access
-    return Response.json({ ok: true });
-  };
-```
+A handler that queries the DB directly, checks business rules, and formats output.
 
-**Fix:** Handler calls action. Action does the work.
+**Fix:** Handler calls action. Action does the work. Handler only parses, delegates, responds.
 
 ---
 
-### ❌ Shared Code Between Features (horizontal dependency)
+### ❌ Shared Code Between Features
 
-```typescript
-// features/dashboard/dashboard.action.ts
-import { formatProfile } from "../user-profile/lib/helpers"; // ❌ horizontal import
-```
+Feature A imports a helper/type/error from Feature B.
 
-**Fix:** Move `formatProfile` to `entities/user/lib/helpers.ts`.
+**Fix:** Move the shared code down to `entities/{name}/lib/` or `shared/lib/`.
 
 ---
 
-### ❌ Creating Global Barrel Exports (TS/JS-specific)
+### ❌ Global barrel re-exports (TS/JS-specific)
 
-```typescript
-// DON'T create things like:
-// entities/index.ts that re-exports all entities
-// features/index.ts that re-exports all features
-```
+A single `entities/index.ts` or `features/index.ts` that re-exports everything.
 
-**Fix:** Import from specific entity/feature: `@/entities/user`, `@/features/auth`.
-
-> This anti-pattern is TS/JS-specific. In Java / C# / Go, module boundaries are enforced by access modifiers (`package-private`, `internal`, unexported names) — no barrel files involved.
+**Fix:** Import from specific modules: `entities/user`, `features/auth`. In Java / C# / Go, this is enforced naturally by access modifiers.
 
 ---
 
@@ -605,16 +412,16 @@ When refactoring existing code to FAA:
 ### Moving a Service method → Action
 
 1. Identify what the method does (one use case = one action)
-2. Create `features/{name}/{verb}.action.ts`
-3. Extract dependencies into the factory parameter
+2. Create `features/{name}/{verb}.action`
+3. Extract dependencies into constructor/factory parameters
 4. Move feature-specific queries to `features/{name}/db/`
 5. Move reusable entity logic to `entities/{name}/lib/`
-6. Create a thin handler in `features/{name}/api/handler.ts`
-7. Wire in `app/container.ts` and `app/routes.ts`
+6. Create a thin handler in `features/{name}/api/`
+7. Wire in the App layer (DI container + routes)
 
 ### Moving a Repository → Entity DAL
 
-1. Identify generic CRUD operations → `entities/{name}/dal.ts`
+1. Identify generic CRUD operations → `entities/{name}/dal`
 2. Identify reusable domain logic → `entities/{name}/lib/`
 3. Identify feature-specific queries → `features/{name}/db/`
 4. Delete the repository file
@@ -624,7 +431,7 @@ When refactoring existing code to FAA:
 1. List all methods in the service
 2. Group by business use case (each group = one feature)
 3. Create a feature directory for each group
-4. Move each method into its own `.action.ts`
+4. Move each method into its own action
 5. Extract shared entity logic into `entities/{name}/lib/`
 
 ---
@@ -633,14 +440,28 @@ When refactoring existing code to FAA:
 
 Before considering a task done, verify:
 
-- [ ] No upward imports (entity → feature, shared → entity)
-- [ ] No horizontal imports (feature → feature, entity → entity)
-- [ ] Every feature has a public API boundary (`index.ts` in TS/JS; access modifiers in Java/C#/Go)
-- [ ] Actions receive dependencies via factory parameters (no hidden globals)
+- [ ] No upward dependencies (entity → feature, shared → entity)
+- [ ] No horizontal dependencies (feature → feature, entity → entity)
+- [ ] Every feature has a public API boundary (barrel file in TS/JS; access modifiers in Java/C#/Go)
+- [ ] Actions receive dependencies explicitly (no hidden globals)
 - [ ] Handlers are thin (parse → delegate → respond)
 - [ ] DAL contains only generic CRUD (no business logic)
 - [ ] Feature-specific queries live in `features/{name}/db/`
 - [ ] Reusable domain logic lives in `entities/{name}/lib/`
-- [ ] Types are in the correct layer (`features/*/types.ts` or `entities/*/types.ts`)
-- [ ] New feature/entity is registered in `app/container.ts`
-- [ ] Routes are registered in `app/routes.ts`
+- [ ] Types/DTOs are in the correct layer
+- [ ] New feature/entity is registered in the DI container
+- [ ] Routes are registered in the App layer
+
+---
+
+## 🌍 Language Examples
+
+Full working examples with project structure, DI wiring, and code:
+
+| Stack | Example |
+|---|---|
+| TypeScript + Bun | [examples/ts-bun.md](./examples/ts-bun.md) |
+| Kotlin + Spring Boot | [examples/kotlin-springboot.md](./examples/kotlin-springboot.md) |
+| Go + Gin + uber-fx | [examples/golang-gin.md](./examples/golang-gin.md) |
+| Python + Django | [examples/python-django.md](./examples/python-django.md) |
+| C# + ASP.NET Core | [examples/csharp-asp.md](./examples/csharp-asp.md) |

@@ -15,6 +15,7 @@
 - [Where to Put Code](#-where-to-put-code)
 - [Anti-Patterns](#-anti-patterns)
 - [When to Break the Rules](#-when-to-break-the-rules)
+- [Language Examples](#-language-examples)
 
 ---
 
@@ -227,15 +228,15 @@ When in doubt, follow this:
 
 ```mermaid
 graph TD
-    START["I have new code"] --> Q1{"Is it a pure utility?\n(datetime, encoding, math)"}
+    START["I have new code"] --> Q1{"Is it a pure utility?<br/>(datetime, encoding, math)"}
     Q1 -->|Yes| SHARED["📁 shared/lib/"]
-    Q1 -->|No| Q2{"Is it infrastructure?\n(DB driver, logger, config)"}
+    Q1 -->|No| Q2{"Is it infrastructure?<br/>(DB driver, logger, config)"}
     Q2 -->|Yes| INFRA["📁 shared/infra/"]
-    Q2 -->|No| Q3{"Is it generic CRUD\nfor a single entity?"}
+    Q2 -->|No| Q3{"Is it generic CRUD<br/>for a single entity?"}
     Q3 -->|Yes| DAL["📁 entities/{name}/dal.ts"]
-    Q3 -->|No| Q4{"Is it reusable domain logic\nfor a single entity?"}
+    Q3 -->|No| Q4{"Is it reusable domain logic<br/>for a single entity?"}
     Q4 -->|Yes| LIB["📁 entities/{name}/lib/"]
-    Q4 -->|No| Q5{"Is it a complex query\nneeded by one feature?"}
+    Q4 -->|No| Q5{"Is it a complex query<br/>needed by one feature?"}
     Q5 -->|Yes| FDB["📁 features/{name}/db/"]
     Q5 -->|No| ACTION["📁 features/{name}/*.action.ts"]
 
@@ -337,3 +338,17 @@ FAA is practical, not dogmatic. Here are acceptable compromises:
 
 > [!CAUTION]
 > Breaking a rule is fine **if you acknowledge it** and have a plan to fix it later. Silent violations compound into spaghetti.
+
+---
+
+## 🌍 Language Examples
+
+See FAA in action across different stacks:
+
+| Stack | Example |
+|---|---|
+| TypeScript + Bun | [examples/ts-bun.md](./examples/ts-bun.md) |
+| Kotlin + Spring Boot | [examples/kotlin-springboot.md](./examples/kotlin-springboot.md) |
+| Go + Gin + uber-fx | [examples/golang-gin.md](./examples/golang-gin.md) |
+| Python + Django | [examples/python-django.md](./examples/python-django.md) |
+| C# + ASP.NET Core | [examples/csharp-asp.md](./examples/csharp-asp.md) |
