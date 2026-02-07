@@ -165,6 +165,10 @@ features/{feature-name}/
 
 > [!IMPORTANT]
 > `index.ts` is the **only entry point**. Everything else is internal to the feature. External code imports from `features/auth/index.ts`, never from `features/auth/lib/helpers.ts` directly.
+>
+> Keep `index.ts` lean — only re-export what the App layer actually needs (usually the action factory and the handler factory). Don't dump every internal helper into the barrel.
+>
+> **Other languages:** In Java / C# / Go the same idea is enforced by access modifiers (`package-private`, `internal`, unexported). No barrel file needed — just don't make internal classes/methods public.
 
 ### What each file does
 
@@ -204,8 +208,16 @@ entities/{entity-name}/
 | Zero business logic | Can contain business rules |
 | Every entity has it | Only if needed |
 
+Borderline cases:
+
+| Method | Where? | Why |
+|---|---|---|
+| `findAllActive()` | `dal.ts` | It's a simple filter — `find({ active: true })`. Still CRUD. |
+| `findWithStats()` | `lib/queries.ts` | Aggregation / join — goes beyond a basic `.find()` call. |
+| `deactivateExpired()` | `lib/commands.ts` | Contains domain rule (what counts as "expired"). |
+
 > [!TIP]
-> If you're debating "is this CRUD or business logic?" — if it's more than `Model.findOne()`, it probably belongs in `lib/`.
+> If you're debating "is this CRUD or business logic?" — if it's more than a single `Model.findOne()` / `find()` with a trivial filter, it probably belongs in `lib/`.
 
 ---
 
@@ -234,6 +246,12 @@ graph TD
     style FDB fill:#f3e5f5,stroke:#7b1fa2
     style ACTION fill:#f3e5f5,stroke:#7b1fa2
 ```
+
+### Feature or Entity?
+
+> [!TIP]
+> **Will this logic be used by 2+ features?** → Entity (`entities/{name}/lib/`).
+> **Only one feature needs it?** → Keep it in that feature (`features/{name}/db/` or `features/{name}/lib/`).
 
 Quick cheat sheet:
 

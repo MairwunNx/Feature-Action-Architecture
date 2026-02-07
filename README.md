@@ -91,10 +91,10 @@ graph TD
 
 | Layer | What it does | What it contains |
 |---|---|---|
-| **🏗️ App** | Assembles everything | Server init, DI container, router, middleware wiring |
+| **🏗️ App** | Assembles everything | Server init, DI container, router, middleware wiring (auth guards, rate limiting, etc.) |
 | **⚡ Features** | Implements use cases | Actions, HTTP handlers, feature-specific queries |
 | **📦 Entities** | Owns domain data | DB models, CRUD (DAL), reusable domain logic |
-| **🔧 Shared** | Provides tools | Logger, DB drivers, config, HTTP utils, pure helpers |
+| **🔧 Shared** | Provides tools | Logger, DB drivers, config, HTTP utils, pure helpers, reusable middleware |
 
 > [!IMPORTANT]
 > Each layer can only import from layers **below** it. Never up, never sideways.
@@ -140,7 +140,7 @@ src/
 │   └── ...
 │
 └── shared/                       # 🔧 Infrastructure
-    ├── api/                      # HTTP primitives (errors, responses)
+    ├── api/                      # HTTP primitives (errors, responses, middleware)
     ├── lib/                      # Pure functions (datetime, encoding)
     └── infra/                    # Drivers (DB, logger, config)
 ```
@@ -277,7 +277,7 @@ graph LR
 |---|---|---|
 | Feature → Entity | ✅ Allowed | `login.action.ts` imports `userDal` |
 | Feature → Shared | ✅ Allowed | Action imports `datetime` utility |
-| Feature → Feature | ❌ Forbidden | Push shared logic down to Entity |
+| Feature → Feature | ❌ Forbidden | Everything: code, types, errors. Push shared logic down to Entity |
 | Entity → Entity | ❌ Forbidden | Entities are isolated |
 | Entity → Feature | ❌ Forbidden | Never import upward |
 | Shared → anything above | ❌ Forbidden | Shared is the foundation |

@@ -62,7 +62,7 @@ graph TD
 |---|---|
 | **Purpose** | Wire everything together. Create DI container, register routes, start server. |
 | **Can import from** | Features, Entities, Shared |
-| **Contains** | `container.ts`, `routes.ts`, `server.ts`, `factory.ts`, `context.ts`, `cors.ts` |
+| **Contains** | `container.ts`, `routes.ts`, `server.ts`, `factory.ts`, `context.ts`, `cors.ts`, middleware wiring |
 | **Should NOT contain** | Business logic, DB queries, domain types |
 
 ### Features Layer (`features/`)
@@ -89,7 +89,7 @@ graph TD
 |---|---|
 | **Purpose** | Provide infrastructure and pure utilities. |
 | **Can import from** | Nothing above (only external packages) |
-| **Contains** | `api/` (HTTP primitives), `lib/` (pure functions), `infra/` (drivers, config, logger) |
+| **Contains** | `api/` (HTTP primitives, reusable middleware), `lib/` (pure functions), `infra/` (drivers, config, logger) |
 | **Should NOT contain** | Business logic, domain types |
 
 ---
@@ -158,13 +158,15 @@ export const create{Name}Handler = (action: ReturnType<typeof create{Name}Action
 create{Name}Handler.inject = ["{name}Action"] as const;
 ```
 
-### Step 4: Write the index.ts
+### Step 4: Write the index.ts (TS/JS public API boundary)
 
 ```typescript
 // features/{name}/index.ts
 export { create{Name}Action } from "./{name}.action";
 export { create{Name}Handler } from "./api/handler";
 ```
+
+> In Java / C# / Go, skip this step — use access modifiers (`package-private`, `internal`, unexported) to hide internals instead.
 
 ### Step 5: Register in App (typed-inject)
 
@@ -318,6 +320,16 @@ export const createEntityDal = () => ({
 // createEntityDal.inject = ["mongo"] as const;
 ```
 
+### DAL vs Lib — Borderline Cases
+
+| Method | Where? | Why |
+|---|---|---|
+| `findAllActive()` | `dal.ts` | Simple filter — `find({ active: true })`. Still CRUD. |
+| `findWithStats()` | `lib/queries.ts` | Aggregation / join — beyond a basic `.find()`. |
+| `deactivateExpired()` | `lib/commands.ts` | Contains domain rule (what counts as "expired"). |
+
+> Rule of thumb: a single `.find()` / `.findOne()` with a trivial filter → DAL. Anything more complex → `lib/`.
+
 ### Entity Lib Pattern
 
 ```typescript
@@ -424,8 +436,12 @@ Is it a pure utility (datetime, math, encoding)?
 Is it infrastructure (DB driver, logger, config)?
   → shared/infra/
 
-Is it an HTTP primitive (error class, response helper, middleware)?
+Is it an HTTP primitive (error class, response helper)?
   → shared/api/
+
+Is it a reusable middleware (auth guard, rate limiter, request validation)?
+  → shared/api/ (the middleware itself)
+  → app/ (wiring it to routes)
 
 Is it a DB schema/model?
   → entities/{name}/model.ts
@@ -433,7 +449,7 @@ Is it a DB schema/model?
 Is it generic CRUD for one entity?
   → entities/{name}/dal.ts
 
-Is it reusable domain logic for one entity?
+Is it reusable domain logic for one entity (used or will be used by 2+ features)?
   → entities/{name}/lib/
 
 Is it a complex query needed by only one feature?
@@ -476,9 +492,11 @@ import { createUserDal } from "@/entities/user";
 ### ❌ Forbidden Imports
 
 ```typescript
-// Feature → Feature ❌ NEVER
+// Feature → Feature ❌ NEVER (including types, errors, anything)
 import { something } from "../other-feature";
-// Fix: move shared logic to an Entity or Shared
+import type { SomeType } from "../other-feature/types"; // ❌ types too!
+// Fix: move shared logic/types to an Entity or Shared
+// Note: in Java/C# the same rule applies — don't reference classes from another feature's package/namespace.
 
 // Entity → Entity ❌ NEVER
 import { UserModel } from "../user/model";
@@ -566,7 +584,7 @@ import { formatProfile } from "../user-profile/lib/helpers"; // ❌ horizontal i
 
 ---
 
-### ❌ Creating Global Barrel Exports
+### ❌ Creating Global Barrel Exports (TS/JS-specific)
 
 ```typescript
 // DON'T create things like:
@@ -575,6 +593,8 @@ import { formatProfile } from "../user-profile/lib/helpers"; // ❌ horizontal i
 ```
 
 **Fix:** Import from specific entity/feature: `@/entities/user`, `@/features/auth`.
+
+> This anti-pattern is TS/JS-specific. In Java / C# / Go, module boundaries are enforced by access modifiers (`package-private`, `internal`, unexported names) — no barrel files involved.
 
 ---
 
@@ -615,7 +635,7 @@ Before considering a task done, verify:
 
 - [ ] No upward imports (entity → feature, shared → entity)
 - [ ] No horizontal imports (feature → feature, entity → entity)
-- [ ] Every feature has `index.ts` with public API
+- [ ] Every feature has a public API boundary (`index.ts` in TS/JS; access modifiers in Java/C#/Go)
 - [ ] Actions receive dependencies via factory parameters (no hidden globals)
 - [ ] Handlers are thin (parse → delegate → respond)
 - [ ] DAL contains only generic CRUD (no business logic)
