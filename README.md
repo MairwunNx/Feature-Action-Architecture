@@ -349,6 +349,10 @@ Full working examples with project structure, DI wiring, and code snippets:
 | Go + Gin + uber-fx | [examples/golang-gin.md](./examples/golang-gin.md) |
 | Python + Django | [examples/python-django.md](./examples/python-django.md) |
 | C# + ASP.NET Core | [examples/csharp-asp.md](./examples/csharp-asp.md) |
+| Java + Spring Boot | [examples/java-springboot.md](./examples/java-springboot.md) |
+| PHP + Laravel | [examples/php-laravel.md](./examples/php-laravel.md) |
+| F# + Giraffe | [examples/fsharp-giraffe.md](./examples/fsharp-giraffe.md) |
+| Rust + Axum | [examples/rust-axum.md](./examples/rust-axum.md) |
 
 ---
 

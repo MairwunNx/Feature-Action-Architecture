@@ -37,6 +37,10 @@ The boundaries between "service" and "repository" are blurry. One dev puts busin
 
 ## ⚡ The 5 Rules
 
+### Rule 0: 🎯 Features Are User-Facing
+
+A feature implements a **business use case that a user can trigger**. Internal mechanisms — cron jobs, queue workers, background processors — are not features. They live in `shared/infra/` and are wired from `app/`.
+
 ### Rule 1: 🍕 Slice, Don't Layer
 
 **Don't** organize by technical role. **Do** organize by business domain.
@@ -297,7 +301,7 @@ export const createDashboardAction = () =>
   };
 ```
 
-**Fix:** move shared logic to an Entity, then both features import from Entity.
+**Fix:** move shared logic to an Entity or `shared/lib/`. Example: if `auth` and `notifications` both need to send email — `shared/lib/mailer`, not one feature importing the other.
 
 ### ❌ Business logic in DAL
 
@@ -352,3 +356,7 @@ See FAA in action across different stacks:
 | Go + Gin + uber-fx | [examples/golang-gin.md](./examples/golang-gin.md) |
 | Python + Django | [examples/python-django.md](./examples/python-django.md) |
 | C# + ASP.NET Core | [examples/csharp-asp.md](./examples/csharp-asp.md) |
+| Java + Spring Boot | [examples/java-springboot.md](./examples/java-springboot.md) |
+| PHP + Laravel | [examples/php-laravel.md](./examples/php-laravel.md) |
+| F# + Giraffe | [examples/fsharp-giraffe.md](./examples/fsharp-giraffe.md) |
+| Rust + Axum | [examples/rust-axum.md](./examples/rust-axum.md) |

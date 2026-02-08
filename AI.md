@@ -75,6 +75,9 @@ graph TD
 | **CANNOT import from** | Other Features, App |
 | **Contains** | Actions (business logic), HTTP handlers (`api/`), feature-specific queries (`db/`), local helpers (`lib/`), types/DTOs |
 
+> [!IMPORTANT]
+> Features represent **user-facing business use cases only**. Internal mechanisms (cron jobs, queue workers, background processors) are not features — they live in `shared/infra/` and are triggered from `app/`.
+
 ### Entities Layer (`entities/`)
 
 | Aspect | Rule |
@@ -351,7 +354,7 @@ Is it a request/response type for one feature?
 
 | Direction | Why | Fix |
 |---|---|---|
-| Feature → Feature | Horizontal dependency (includes types, errors, everything) | Move shared logic/types to Entity or Shared |
+| Feature → Feature | Horizontal dependency (includes types, errors, everything) | Move shared logic/types to Entity or Shared. Example: email needed by 2+ features → `shared/lib/mailer` |
 | Entity → Entity | Entities are isolated | Do the join in the Feature action |
 | Entity → Feature | Upward dependency | Never |
 | Shared → Entity | Upward dependency | Never |
@@ -454,6 +457,34 @@ Before considering a task done, verify:
 
 ---
 
+## 🧪 Testing
+
+FAA makes unit testing straightforward because **all dependencies are explicit**. To test an action, pass mock implementations of its dependencies.
+
+### Example (TypeScript)
+
+```typescript
+it("register creates a user and returns their data", async () => {
+  const mockDal = {
+    findByEmail: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue({ id: 1, email: "a@b.com", name: "Alice" }),
+  };
+
+  const register = createRegisterAction({ userDal: mockDal });
+  const result = await register({ email: "a@b.com", password: "pass", name: "Alice" });
+
+  expect(result).toEqual({ id: 1, email: "a@b.com", name: "Alice" });
+  expect(mockDal.create).toHaveBeenCalledOnce();
+});
+```
+
+The same principle applies in any language: pass stubs/mocks for the DAL and config, test the action in isolation.
+
+> [!TIP]
+> If a test needs many mocked dependencies, the action is probably doing too much. Split it.
+
+---
+
 ## 🌍 Language Examples
 
 Full working examples with project structure, DI wiring, and code:
@@ -465,3 +496,7 @@ Full working examples with project structure, DI wiring, and code:
 | Go + Gin + uber-fx | [examples/golang-gin.md](./examples/golang-gin.md) |
 | Python + Django | [examples/python-django.md](./examples/python-django.md) |
 | C# + ASP.NET Core | [examples/csharp-asp.md](./examples/csharp-asp.md) |
+| Java + Spring Boot | [examples/java-springboot.md](./examples/java-springboot.md) |
+| PHP + Laravel | [examples/php-laravel.md](./examples/php-laravel.md) |
+| F# + Giraffe | [examples/fsharp-giraffe.md](./examples/fsharp-giraffe.md) |
+| Rust + Axum | [examples/rust-axum.md](./examples/rust-axum.md) |
