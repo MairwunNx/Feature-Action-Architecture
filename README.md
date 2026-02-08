@@ -316,7 +316,7 @@ This makes the docs **local to the repo**, so agents can always read them.
 
 or
 
-```bash
+```shell
 git submodule add https://github.com/MairwunNx/Feature-Action-Architecture.git Feature-Action-Architecture
 ```
 

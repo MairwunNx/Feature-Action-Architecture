@@ -316,7 +316,7 @@ graph LR
 
 или
 
-```bash
+```shell
 git submodule add https://github.com/MairwunNx/Feature-Action-Architecture.git Feature-Action-Architecture
 ```
 
