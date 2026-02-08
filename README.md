@@ -314,6 +314,12 @@ This makes the docs **local to the repo**, so agents can always read them.
   url = https://github.com/MairwunNx/Feature-Action-Architecture.git
 ```
 
+or
+
+```bash
+git submodule add https://github.com/MairwunNx/Feature-Action-Architecture.git Feature-Action-Architecture
+```
+
 **Project prompt snippet (you can paste into your AI/project prompt):**
 
 ```

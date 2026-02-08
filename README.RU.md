@@ -314,6 +314,12 @@ graph LR
   url = https://github.com/MairwunNx/Feature-Action-Architecture.git
 ```
 
+или
+
+```bash
+git submodule add https://github.com/MairwunNx/Feature-Action-Architecture.git Feature-Action-Architecture
+```
+
 **Сниппет для проектного промпта (можно вставить как есть, удалив комментарии и подставив свои значения):**
 
 ```
